@@ -1,56 +1,110 @@
+from __future__ import annotations
+
 import unittest
 
-from snack_recommender import AGE_GROUPS, BEVERAGE_MODES, build_recommendation
+from catalog import AGE_PROFILE_DESCRIPTIONS
+from snack_recommender import (
+    build_recommendation,
+    choose_pack_mix,
+    coupang_search_url,
+)
+from catalog import PackOption
 
 
-class RecommendationEngineTest(unittest.TestCase):
-    def test_all_standard_combinations_stay_within_budget(self):
-        for headcount in (1, 5, 10, 20, 30, 50, 80, 100):
-            for beverage_mode in BEVERAGE_MODES:
-                for age_group in AGE_GROUPS:
-                    with self.subTest(
-                        headcount=headcount,
-                        beverage_mode=beverage_mode,
-                        age_group=age_group,
-                    ):
-                        result = build_recommendation(
-                            headcount=headcount,
-                            beverage_mode=beverage_mode,
-                            age_group=age_group,
-                            per_person_budget=5_000,
-                            spare_rate=15,
-                            duration="2~4시간",
-                        )
-                        self.assertLessEqual(result.estimated_total, result.budget_cap)
-                        self.assertTrue(result.rows)
-                        self.assertTrue(all(row.search_url.startswith("https://www.coupang.com/np/search?q=") for row in result.rows))
+class PackMixTests(unittest.TestCase):
+    def test_pack_mix_meets_target_and_chooses_low_cost(self) -> None:
+        quantity, cost, description = choose_pack_mix(
+            25,
+            (PackOption(1, 600), PackOption(12, 6_000), PackOption(24, 10_000)),
+        )
+        self.assertGreaterEqual(quantity, 25)
+        self.assertEqual(cost, 10_600)
+        self.assertIn("24입", description)
 
-    def test_no_drink_mode_has_no_drink_rows(self):
+
+class RecommendationTests(unittest.TestCase):
+    def test_budget_cap_uses_headcount_days_and_daily_budget(self) -> None:
         result = build_recommendation(
             headcount=30,
+            education_days=5,
+            per_person_daily_budget=10_000,
+        )
+        self.assertEqual(result.person_days, 150)
+        self.assertEqual(result.cumulative_per_person_cap, 50_000)
+        self.assertEqual(result.budget_cap, 1_500_000)
+        self.assertLessEqual(result.estimated_total, result.budget_cap)
+
+
+    def test_default_daily_budget_is_ten_thousand_won(self) -> None:
+        result = build_recommendation(headcount=30, education_days=5)
+        self.assertEqual(result.per_person_daily_budget, 10_000)
+        self.assertEqual(result.cumulative_per_person_cap, 50_000)
+        self.assertEqual(result.budget_cap, 1_500_000)
+
+    def test_budget_above_daily_cap_raises_error(self) -> None:
+        with self.assertRaises(ValueError):
+            build_recommendation(
+                headcount=30,
+                education_days=1,
+                per_person_daily_budget=10_100,
+            )
+
+    def test_daily_plan_count_matches_days(self) -> None:
+        result = build_recommendation(headcount=20, education_days=4)
+        self.assertEqual(len(result.daily_plans), 4)
+        self.assertTrue(all(plan.day >= 1 for plan in result.daily_plans))
+
+    def test_five_day_plan_rotates_snacks(self) -> None:
+        result = build_recommendation(headcount=30, education_days=5)
+        combinations = {plan.snack_names for plan in result.daily_plans}
+        self.assertGreaterEqual(len(combinations), 3)
+
+    def test_default_plan_has_at_least_two_snacks_per_day(self) -> None:
+        result = build_recommendation(headcount=30, education_days=3)
+        self.assertTrue(all(len(plan.snack_names) >= 2 for plan in result.daily_plans))
+
+    def test_beverage_excluded_has_no_drink_rows(self) -> None:
+        result = build_recommendation(
+            headcount=30,
+            education_days=2,
             beverage_mode="음료 제외",
-            age_group="연령대 혼합",
         )
-        self.assertTrue(all(row.category == "다과" for row in result.rows))
+        self.assertEqual(result.drink_total, 0)
+        self.assertTrue(all(row.category != "음료" for row in result.rows))
+        self.assertTrue(all(not plan.drink_names for plan in result.daily_plans))
 
-    def test_water_mode_contains_water(self):
-        result = build_recommendation(
-            headcount=30,
-            beverage_mode="생수만 포함",
-            age_group="연령대 혼합",
-        )
-        self.assertIn("water", {row.product_key for row in result.rows})
+    def test_urls_are_coupang_search_links(self) -> None:
+        result = build_recommendation(headcount=15, education_days=2)
+        self.assertGreaterEqual(len(result.rows), 3)
+        self.assertTrue(all(row.search_url.startswith("https://www.coupang.com/np/search?q=") for row in result.rows))
+        self.assertIn("+", coupang_search_url("생수 500ml 대량"))
 
-    def test_snack_quantity_has_spare(self):
-        result = build_recommendation(
-            headcount=30,
-            beverage_mode="음료 제외",
-            age_group="연령대 혼합",
-            spare_rate=20,
+    def test_age_descriptions_are_distinct(self) -> None:
+        self.assertNotEqual(
+            AGE_PROFILE_DESCRIPTIONS["20~30대 중심"],
+            AGE_PROFILE_DESCRIPTIONS["40~50대 중심"],
         )
-        snack_rows = [row for row in result.rows if row.category == "다과"]
-        self.assertTrue(snack_rows)
-        self.assertTrue(all(row.purchased_units >= 36 for row in snack_rows))
+
+    def test_invalid_days_raise_error(self) -> None:
+        with self.assertRaises(ValueError):
+            build_recommendation(headcount=30, education_days=0)
+        with self.assertRaises(ValueError):
+            build_recommendation(headcount=30, education_days=6)
+
+    def test_low_budget_still_respects_cap(self) -> None:
+        result = build_recommendation(
+            headcount=10,
+            education_days=5,
+            beverage_mode="생수 + 커피 + 주스 포함",
+            per_person_daily_budget=3_500,
+        )
+        self.assertLessEqual(result.estimated_total, result.budget_cap)
+
+    def test_markdown_and_service_days_are_consistent(self) -> None:
+        result = build_recommendation(headcount=30, education_days=3)
+        valid_days = set(range(1, 4))
+        for row in result.rows:
+            self.assertTrue(set(row.service_days).issubset(valid_days))
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """교육용 다과 추천에 사용하는 추정 상품 카탈로그.
 
 가격은 실시간 판매가가 아니라 추천 계산용 기준값입니다.
-실제 배포 후에는 이 파일의 pack_options만 주기적으로 조정하면 됩니다.
+운영 시 ``pack_options``를 월 1회 또는 행사 전에 점검해 주세요.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ PRODUCTS: dict[str, Product] = {
     ),
     "chamssal": Product(
         "chamssal", "참쌀설병", "다과", "참쌀설병 대용량 개별포장",
-        "단맛 위주 구성을 보완하고 중장년층 선호도도 높음",
+        "단맛 위주 구성을 보완하고 중장년층이 포함된 교육에도 무난함",
         (PackOption(1, 550), PackOption(6, 3_400), PackOption(15, 7_400), PackOption(30, 13_000)),
     ),
     "mini_yakgwa": Product(
@@ -57,7 +57,7 @@ PRODUCTS: dict[str, Product] = {
     ),
     "binch": Product(
         "binch", "빈츠", "다과", "빈츠 대용량 개별포장",
-        "깔끔한 초콜릿 비스킷으로 20~40대 선호도가 높음",
+        "깔끔한 초콜릿 비스킷으로 달콤한 구성을 원하는 교육에 적합",
         (PackOption(1, 700), PackOption(6, 4_200), PackOption(12, 7_500), PackOption(24, 13_500)),
     ),
     "kukudas": Product(
@@ -67,7 +67,7 @@ PRODUCTS: dict[str, Product] = {
     ),
     "grain_bar": Product(
         "grain_bar", "곡물바", "다과", "곡물바 30개 개별포장",
-        "긴 교육에서 포만감을 보완하고 지나치게 달지 않음",
+        "장기 교육에서 포만감을 보완하고 지나치게 달지 않음",
         (PackOption(1, 800), PackOption(6, 5_000), PackOption(12, 9_200), PackOption(30, 19_500)),
     ),
     "nuts": Product(
@@ -77,7 +77,7 @@ PRODUCTS: dict[str, Product] = {
     ),
     "free_time": Product(
         "free_time", "자유시간 미니", "다과", "자유시간 미니 대용량",
-        "젊은 연령층의 선호도가 높고 작은 크기로 배포가 편함",
+        "작은 크기로 배포가 편하고 달콤한 바 형태 간식을 선호할 때 적합",
         (PackOption(1, 750), PackOption(10, 6_500), PackOption(18, 10_500), PackOption(36, 18_000)),
     ),
     "ohyes": Product(
@@ -100,11 +100,10 @@ PRODUCTS: dict[str, Product] = {
         "익숙한 샌드형 과자로 가격 부담이 낮고 배포가 쉬움",
         (PackOption(1, 550), PackOption(6, 3_400), PackOption(24, 11_000)),
     ),
-
     # 음료
     "water": Product(
         "water", "생수 500ml", "음료", "생수 500ml 대량",
-        "모든 참석자에게 기본으로 제공하기 좋고 보관이 간편",
+        "모든 참석자에게 매일 기본으로 제공하기 좋고 보관이 간편",
         (PackOption(1, 500), PackOption(6, 3_300), PackOption(20, 7_500), PackOption(40, 12_500)),
     ),
     "coffee_can": Product(
@@ -124,12 +123,12 @@ PRODUCTS: dict[str, Product] = {
     ),
     "tea": Product(
         "tea", "차음료", "음료", "차음료 대량 세트",
-        "단맛이 과하지 않고 중장년층까지 폭넓게 제공 가능",
+        "단맛이 과하지 않고 다양한 연령대에 폭넓게 제공 가능",
         (PackOption(1, 1_200), PackOption(6, 6_800), PackOption(10, 10_800), PackOption(20, 21_000)),
     ),
     "soy_milk": Product(
         "soy_milk", "두유", "음료", "두유 대량 세트",
-        "포만감을 보완하며 40대 이상이 포함된 교육에 적합",
+        "포만감을 보완하며 담백한 음료를 원하는 교육에 적합",
         (PackOption(1, 1_000), PackOption(6, 5_800), PackOption(16, 14_500), PackOption(24, 20_000)),
     ),
 }
@@ -143,11 +142,40 @@ AGE_SNACK_PRIORITY: dict[str, tuple[str, ...]] = {
     "연령대 혼합": ("butter_waffle", "monshell", "custard", "chamssal", "mini_yakgwa", "kukudas"),
 }
 
-
 AGE_DRINK_PRIORITY: dict[str, tuple[str, str]] = {
     "20~30대 중심": ("coffee_can", "juice"),
     "30~40대 중심": ("coffee_bottle", "tea"),
     "40~50대 중심": ("tea", "coffee_bottle"),
     "50대 이상 포함": ("soy_milk", "tea"),
     "연령대 혼합": ("coffee_can", "juice"),
+}
+
+AGE_PROFILE_DESCRIPTIONS: dict[str, str] = {
+    "20~30대 중심": (
+        "달콤하고 간편한 구성의 비중을 높입니다. 초콜릿·쿠키·바류와 "
+        "캔커피·주스를 우선하되, 선호를 단정하지 않고 기본 추천 가중치로만 사용합니다."
+    ),
+    "30~40대 중심": (
+        "달콤한 과자와 담백한 간식의 균형을 맞춥니다. 버터와플·카스타드·곡물바와 "
+        "병커피·차음료를 함께 고려합니다."
+    ),
+    "40~50대 중심": (
+        "너무 단 제품에 치우치지 않도록 담백한 과자·곡물바·견과류 비중을 높이고 "
+        "차음료·병커피를 우선합니다."
+    ),
+    "50대 이상 포함": (
+        "부드럽고 익숙한 과자와 담백한 음료를 우선합니다. 지나치게 딱딱하거나 "
+        "단맛이 강한 품목만으로 구성하지 않습니다."
+    ),
+    "연령대 혼합": (
+        "버터와플·몽쉘·카스타드·참쌀설병처럼 호불호가 적은 품목을 섞고 "
+        "생수와 보조 음료를 무난하게 배분합니다."
+    ),
+}
+
+TASTE_SNACK_PRIORITY: dict[str, tuple[str, ...]] = {
+    "연령대 추천 자동": (),
+    "달콤하고 간편한 구성": ("monshell", "binch", "kukudas", "free_time", "ohyes", "french_pie"),
+    "담백함을 더한 균형 구성": ("butter_waffle", "custard", "chamssal", "mini_yakgwa", "grain_bar", "nuts"),
+    "호불호 적은 기본 구성": ("butter_waffle", "monshell", "custard", "chamssal", "mini_yakgwa", "kukudas"),
 }
